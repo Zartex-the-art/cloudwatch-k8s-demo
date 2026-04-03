@@ -1,11 +1,9 @@
 pipeline {
     agent any
-
     environment {
         IMAGE_NAME = 'zartu/cloudwatch-k8s-demo'
         IMAGE_TAG  = "v${BUILD_NUMBER}"
     }
-
     stages {
         stage('Checkout') {
             steps {
@@ -48,7 +46,6 @@ pipeline {
             }
         }
     }
-
     post {
         success { echo "Done. Image pushed: ${IMAGE_NAME}:${IMAGE_TAG}" }
         failure { echo "Pipeline failed. Check logs above." }
