@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'zartu/cloudwatch-k8s-demo'
+        IMAGE_TAG  = "v${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Branch: ${GIT_BRANCH}"
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'export PATH=$PATH:/usr/local/go/bin && go test ./... -v'
+            }
+        }
+        stage('Build Binary') {
+            steps {
+                sh 'export PATH=$PATH:/usr/local/go/bin && CGO_ENABLED=0 GOOS=linux go build -o app .'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
+            }
+        }
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker push ${IMAGE_NAME}:latest"
+                }
+            }
+        }
+        stage('Cleanup') {
+            steps {
+                sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
+                sh 'rm -f app'
+            }
+        }
+    }
+
+    post {
+        success { echo "Done. Image pushed: ${IMAGE_NAME}:${IMAGE_TAG}" }
+        failure { echo "Pipeline failed. Check logs above." }
+    }
+}
